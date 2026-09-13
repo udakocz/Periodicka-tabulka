@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Chemické kartičky</title>
+  <style>
+    :root{
+      --bg1:#eef4ff;
+      --bg2:#f8fbff;
+      --card:rgba(255,255,255,.88);
+      --text:#111827;
+      --muted:#7a8496;
+      --primary:#4f46e5;
+      --primary2:#6d5dfc;
+      --soft:#eef0ff;
+      --border:rgba(99,102,241,.12);
+      --shadow:0 24px 70px rgba(56,65,110,.16);
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;min-height:100%}
+    body{min-height:100vh;display:grid;place-items:center;padding:24px;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 15% 15%, rgba(99,102,241,.13), transparent 34%),radial-gradient(circle at 85% 85%, rgba(59,130,246,.10), transparent 32%),linear-gradient(160deg,var(--bg1),var(--bg2));}
+    .app{width:min(100%,460px)}
+    .top{text-align:center;margin-bottom:18px}
+    .title{margin:0;font-size:28px;line-height:1.1;font-weight:900;letter-spacing:-.04em}
+    .subtitle{margin:7px 0 0;color:var(--muted);font-size:14px}
+    .card{position:relative;overflow:hidden;min-height:440px;display:flex;flex-direction:column;justify-content:center;background:var(--card);border:1px solid rgba(255,255,255,.7);border-radius:30px;padding:36px 28px 28px;box-shadow:var(--shadow);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+    .card::before{content:"";position:absolute;width:180px;height:180px;border-radius:50%;top:-90px;right:-70px;background:linear-gradient(135deg,rgba(79,70,229,.12),rgba(96,165,250,.08));pointer-events:none}
+    .label{text-align:center;color:var(--muted);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;margin-bottom:20px}
+    .formula-wrap{display:flex;align-items:center;justify-content:center;min-height:132px}
+    .formula{font-size:84px;line-height:1;font-weight:950;letter-spacing:-.055em;margin:0;transition:opacity .16s ease, transform .16s ease}
+    .formula.changing{opacity:0;transform:translateY(8px) scale(.97)}
+    .answer-area{min-height:72px;display:flex;align-items:center;justify-content:center;margin:8px 0 22px}
+    .name{margin:0;font-size:30px;line-height:1.15;font-weight:900;letter-spacing:-.025em;opacity:0;transform:translateY(8px);transition:opacity .2s ease, transform .2s ease;pointer-events:none}
+    .name.visible{opacity:1;transform:none}
+    .controls{display:grid;gap:10px}
+    button{appearance:none;border:0;width:100%;min-height:56px;border-radius:17px;font-size:17px;font-weight:850;cursor:pointer;transition:transform .12s ease, box-shadow .12s ease, background .12s ease;-webkit-tap-highlight-color:transparent}
+    button:active{transform:scale(.985)}
+    .reveal{color:#fff;background:linear-gradient(135deg,var(--primary),var(--primary2));box-shadow:0 12px 26px rgba(79,70,229,.25)}
+    .reveal:hover{box-shadow:0 14px 30px rgba(79,70,229,.32)}
+    .next{display:none;color:#3730a3;background:var(--soft);border:1px solid var(--border)}
+    .next.show{display:block}
+    .bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px;padding:0 4px;color:var(--muted);font-size:13px}
+    .progress{flex:1;height:7px;background:rgba(99,102,241,.10);border-radius:999px;overflow:hidden}
+    .progress-bar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--primary),#60a5fa);transition:width .2s ease}
+    @media (max-width:480px){body{padding:16px}.title{font-size:25px}.card{min-height:410px;padding:30px 22px 22px;border-radius:26px}.formula{font-size:76px}.name{font-size:28px}}
+  </style>
+</head>
+<body>
+  <main class="app">
+    <div class="top">
+      <h1 class="title">Chemické kartičky</h1>
+      <p class="subtitle">Poznej prvek nebo molekulu podle značky</p>
+    </div>
+    <section class="card">
+      <div class="label">Co je to?</div>
+      <div class="formula-wrap"><div id="formula" class="formula">H₂O</div></div>
+      <div class="answer-area"><div id="name" class="name" aria-live="polite">Voda</div></div>
+      <div class="controls">
+        <button id="reveal" class="reveal">Zobrazit název</button>
+        <button id="next" class="next">Další kartička →</button>
+      </div>
+    </section>
+    <div class="bottom">
+      <span id="counter">1 / 17</span>
+      <div class="progress" aria-hidden="true"><div id="progressBar" class="progress-bar"></div></div>
+    </div>
+  </main>
+<script>
+const cards=[["H₂O","Voda"],["O₂","Kyslík"],["CO₂","Oxid uhličitý"],["H₂","Vodík"],["N₂","Dusík"],["Mg","Hořčík"],["Ca","Vápník"],["Na","Sodík"],["K","Draslík"],["Cu","Měď"],["Sn","Cín"],["Fe","Železo"],["Zn","Zinek"],["Pb","Olovo"],["Hg","Rtuť"],["S","Síra"],["Au","Zlato"]];
+let deck=[],index=0,transitioning=false;
+const formulaEl=document.getElementById("formula"),nameEl=document.getElementById("name"),revealBtn=document.getElementById("reveal"),nextBtn=document.getElementById("next"),counterEl=document.getElementById("counter"),progressBar=document.getElementById("progressBar");
+function shuffle(array){const a=[...array];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function newDeck(){deck=shuffle(cards);index=0}
+function updateProgress(){counterEl.textContent=`${index+1} / ${deck.length}`;progressBar.style.width=`${((index+1)/deck.length)*100}%`}
+function setCardInstantly(){const [formula,name]=deck[index];nameEl.classList.remove("visible");nameEl.textContent="";nextBtn.classList.remove("show");revealBtn.style.display="block";formulaEl.textContent=formula;nameEl.textContent=name;updateProgress()}
+function showNextCard(){if(transitioning)return;transitioning=true;nameEl.classList.remove("visible");nameEl.textContent="";nextBtn.classList.remove("show");revealBtn.style.display="block";formulaEl.classList.add("changing");setTimeout(()=>{index++;if(index>=deck.length)newDeck();const [formula,name]=deck[index];formulaEl.textContent=formula;nameEl.textContent=name;updateProgress();requestAnimationFrame(()=>{formulaEl.classList.remove("changing");transitioning=false})},120)}
+revealBtn.addEventListener("click",()=>{nameEl.classList.add("visible");revealBtn.style.display="none";nextBtn.classList.add("show")});
+nextBtn.addEventListener("click",showNextCard);
+newDeck();setCardInstantly();
+</script>
+</body>
+</html>
