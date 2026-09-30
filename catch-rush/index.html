@@ -150,7 +150,7 @@ function renderBoard(){
 }
 
 function place(){
-  const size=Math.max(38,76-Math.floor(hits/6)*4);
+  const size=Math.max(34,76-Math.floor(hits/4)*5);
   ball.style.width=size+"px";ball.style.height=size+"px";
   const x=Math.max(0,arena.clientWidth-size-8),y=Math.max(0,arena.clientHeight-size-8);
   ball.style.left=(4+Math.random()*x)+"px";ball.style.top=(4+Math.random()*y)+"px";
@@ -159,7 +159,7 @@ function place(){
 function schedule(){
   clearTimeout(moveTimer);
   if(!running)return;
-  const ms=Math.max(360,1100-hits*22);
+  const ms=Math.max(250,950-hits*28);
   moveTimer=setTimeout(()=>{combo=1;comboEl.textContent="×1";place();schedule()},ms);
 }
 
