@@ -83,48 +83,143 @@ input:focus{border-color:#8e76ff;box-shadow:0 0 0 3px rgba(142,118,255,.15)}
   </section>
 
   <section class="card leader">
-    <div class="leaderhead"><h3>🏆 TOP 10</h3><span class="note">nejlepší skóre na tomto zařízení</span></div>
+    <div class="leaderhead"><h3>🏆 TOP 10</h3><span class="note">společný online žebříček</span></div>
     <div id="leaderboard"></div>
   </section>
 </main>
 <script>
 (()=>{
-const KEY="catchRushScoresV1";
+const SUPABASE_URL="https://thmcufjrawvglladrbts.supabase.co";
+const SUPABASE_KEY="sb_publishable_fq0HuyJ_FqbCjwrCNkcRIA_khgVdrrG";
 const $=id=>document.getElementById(id);
 const start=$("start"),game=$("game"),result=$("result"),form=$("startForm"),playerInput=$("player"),error=$("error");
 const arena=$("arena"),ball=$("ball"),scoreEl=$("score"),timeEl=$("time"),comboEl=$("combo"),bestEl=$("best");
 const finalScore=$("finalScore"),resultTitle=$("resultTitle"),resultText=$("resultText"),board=$("leaderboard");
-let scores={};try{scores=JSON.parse(localStorage.getItem(KEY)||"{}")||{}}catch(e){scores={}}
-let player="",score=0,hits=0,combo=1,remaining=30,running=false,last=0,timer=null,moveTimer=null;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(scores))}catch(e){}}
+let scores={},player="",score=0,hits=0,combo=1,remaining=30,running=false,last=0,timer=null,moveTimer=null;
+
 function clean(v){return v.trim().replace(/\s+/g," ").slice(0,18)}
+
+async function loadLeaderboard(){
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/catch_rush_scores?select=player_name,score&order=score.desc&limit=100",{
+      headers:{apikey:SUPABASE_KEY}
+    });
+    if(!r.ok) throw new Error("Leaderboard unavailable");
+    const data=await r.json();
+    const bestByName={};
+    for(const row of data){
+      const n=clean(String(row.player_name||""));
+      const s=Number(row.score)||0;
+      if(n && (bestByName[n]===undefined || s>bestByName[n])) bestByName[n]=s;
+    }
+    scores=bestByName;
+    renderBoard();
+    if(player) bestEl.textContent=scores[player]||0;
+  }catch(e){
+    if(!Object.keys(scores).length){
+      board.innerHTML='<div class="note" style="padding:10px 5px">Žebříček se teď nepodařilo načíst.</div>';
+    }
+  }
+}
+
+async function submitScore(name,value){
+  try{
+    const r=await fetch(SUPABASE_URL+"/rest/v1/catch_rush_scores",{
+      method:"POST",
+      headers:{apikey:SUPABASE_KEY,"Content-Type":"application/json","Prefer":"return=minimal"},
+      body:JSON.stringify({player_name:name,score:value})
+    });
+    if(!r.ok) throw new Error("Score save failed");
+    return true;
+  }catch(e){return false}
+}
+
 function renderBoard(){
-  const rows=Object.entries(scores).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"cs")).slice(0,10);board.innerHTML="";
-  if(!rows.length){const x=document.createElement("div");x.className="note";x.style.padding="10px 5px";x.textContent="Zatím žádné skóre. Buď první!";board.appendChild(x);return}
-  rows.forEach(([n,s],i)=>{const r=document.createElement("div");r.className="row";const a=document.createElement("div"),b=document.createElement("div"),c=document.createElement("div");a.className="rank";b.className="name";c.className="pts";a.textContent=(i+1)+".";b.textContent=n;c.textContent=s+" b.";r.append(a,b,c);board.appendChild(r)})
+  const rows=Object.entries(scores).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0],"cs")).slice(0,10);
+  board.innerHTML="";
+  if(!rows.length){
+    const x=document.createElement("div");x.className="note";x.style.padding="10px 5px";x.textContent="Zatím žádné skóre. Buď první!";board.appendChild(x);return;
+  }
+  rows.forEach(([n,s],i)=>{
+    const r=document.createElement("div");r.className="row";
+    const a=document.createElement("div"),b=document.createElement("div"),c=document.createElement("div");
+    a.className="rank";b.className="name";c.className="pts";
+    a.textContent=(i+1)+".";b.textContent=n;c.textContent=s+" b.";
+    r.append(a,b,c);board.appendChild(r);
+  });
 }
+
 function place(){
-  const size=Math.max(38,76-Math.floor(hits/6)*4);ball.style.width=size+"px";ball.style.height=size+"px";
-  const x=Math.max(0,arena.clientWidth-size-8),y=Math.max(0,arena.clientHeight-size-8);ball.style.left=(4+Math.random()*x)+"px";ball.style.top=(4+Math.random()*y)+"px";
+  const size=Math.max(38,76-Math.floor(hits/6)*4);
+  ball.style.width=size+"px";ball.style.height=size+"px";
+  const x=Math.max(0,arena.clientWidth-size-8),y=Math.max(0,arena.clientHeight-size-8);
+  ball.style.left=(4+Math.random()*x)+"px";ball.style.top=(4+Math.random()*y)+"px";
 }
-function schedule(){clearTimeout(moveTimer);if(!running)return;const ms=Math.max(360,1100-hits*22);moveTimer=setTimeout(()=>{combo=1;comboEl.textContent="×1";place();schedule()},ms)}
-function hud(){scoreEl.textContent=score;comboEl.textContent="×"+combo;bestEl.textContent=scores[player]||0}
+
+function schedule(){
+  clearTimeout(moveTimer);
+  if(!running)return;
+  const ms=Math.max(360,1100-hits*22);
+  moveTimer=setTimeout(()=>{combo=1;comboEl.textContent="×1";place();schedule()},ms);
+}
+
+function hud(){
+  scoreEl.textContent=score;
+  comboEl.textContent="×"+combo;
+  bestEl.textContent=scores[player]||0;
+}
+
 function startGame(){
-  score=0;hits=0;combo=1;remaining=30;running=true;last=performance.now();start.style.display="none";result.style.display="none";game.style.display="block";hud();timeEl.textContent="30.0";
-  requestAnimationFrame(()=>{place();schedule()});clearInterval(timer);
-  timer=setInterval(()=>{const now=performance.now();remaining-=(now-last)/1000;last=now;if(remaining<=0){remaining=0;timeEl.textContent="0.0";finish();return}timeEl.textContent=remaining.toFixed(1)},50)
+  score=0;hits=0;combo=1;remaining=30;running=true;last=performance.now();
+  start.style.display="none";result.style.display="none";game.style.display="block";
+  hud();timeEl.textContent="30.0";
+  requestAnimationFrame(()=>{place();schedule()});
+  clearInterval(timer);
+  timer=setInterval(()=>{
+    const now=performance.now();remaining-=(now-last)/1000;last=now;
+    if(remaining<=0){remaining=0;timeEl.textContent="0.0";finish();return}
+    timeEl.textContent=remaining.toFixed(1);
+  },50);
 }
-function finish(){
-  if(!running)return;running=false;clearInterval(timer);clearTimeout(moveTimer);game.style.display="none";result.style.display="block";
-  const old=scores[player]||0,newRecord=score>old;if(newRecord){scores[player]=score;save()}renderBoard();
-  finalScore.textContent=score;resultTitle.textContent=newRecord?"🔥 Nový rekord!":"Dobrá hra!";resultText.textContent=player+" · nejlepší skóre: "+(scores[player]||score)+" bodů";
+
+async function finish(){
+  if(!running)return;
+  running=false;clearInterval(timer);clearTimeout(moveTimer);
+  game.style.display="none";result.style.display="block";
+  const old=scores[player]||0;
+  const newRecord=score>old;
+  finalScore.textContent=score;
+  resultTitle.textContent=newRecord?"🔥 Nový rekord!":"Dobrá hra!";
+  resultText.textContent=player+" · ukládám skóre…";
+  const ok=await submitScore(player,score);
+  if(ok){
+    if(score>old)scores[player]=score;
+    await loadLeaderboard();
+    resultText.textContent=player+" · nejlepší skóre: "+(scores[player]||score)+" bodů";
+  }else{
+    resultText.textContent=player+" · skóre se nepodařilo uložit. Zkus to znovu.";
+  }
 }
-form.addEventListener("submit",e=>{e.preventDefault();const n=clean(playerInput.value);if(n.length<2){error.textContent="Napiš jméno alespoň o 2 znacích.";playerInput.focus();return}error.textContent="";player=n;startGame()});
-ball.addEventListener("click",()=>{if(!running)return;hits++;combo=Math.min(8,1+Math.floor(hits/4));score+=combo;hud();place();schedule()});
+
+form.addEventListener("submit",e=>{
+  e.preventDefault();
+  const n=clean(playerInput.value);
+  if(n.length<2){error.textContent="Napiš jméno alespoň o 2 znacích.";playerInput.focus();return}
+  error.textContent="";player=n;startGame();
+});
+
+ball.addEventListener("click",()=>{
+  if(!running)return;
+  hits++;combo=Math.min(8,1+Math.floor(hits/4));score+=combo;hud();place();schedule();
+});
+
 $("again").addEventListener("click",startGame);
-$("change").addEventListener("click",()=>{result.style.display="none";start.style.display="grid";playerInput.focus()});
+$("change").addEventListener("click",()=>{
+  result.style.display="none";start.style.display="grid";playerInput.focus();
+});
 window.addEventListener("resize",()=>{if(running)place()});
-renderBoard();
+loadLeaderboard();
+setInterval(()=>{if(!running)loadLeaderboard()},15000);
 })();
 </script>
 </body></html>
