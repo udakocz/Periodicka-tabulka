@@ -149,11 +149,24 @@ function renderBoard(){
   });
 }
 
+let lastX=null,lastY=null;
 function place(){
   const size=Math.max(34,76-Math.floor(hits/4)*5);
   ball.style.width=size+"px";ball.style.height=size+"px";
-  const x=Math.max(0,arena.clientWidth-size-8),y=Math.max(0,arena.clientHeight-size-8);
-  ball.style.left=(4+Math.random()*x)+"px";ball.style.top=(4+Math.random()*y)+"px";
+  const maxX=Math.max(0,arena.clientWidth-size-8),maxY=Math.max(0,arena.clientHeight-size-8);
+  let nx=4,ny=4;
+  const minDist=Math.min(arena.clientWidth,arena.clientHeight)*0.34;
+  for(let i=0;i<20;i++){
+    nx=4+Math.random()*maxX;
+    ny=4+Math.random()*maxY;
+    if(lastX===null||Math.hypot(nx-lastX,ny-lastY)>=minDist) break;
+  }
+  if(lastX!==null && Math.hypot(nx-lastX,ny-lastY)<minDist){
+    nx=lastX<arena.clientWidth/2 ? Math.max(4,maxX-4) : 4;
+    ny=lastY<arena.clientHeight/2 ? Math.max(4,maxY-4) : 4;
+  }
+  lastX=nx;lastY=ny;
+  ball.style.left=nx+"px";ball.style.top=ny+"px";
 }
 
 function schedule(){
@@ -170,7 +183,7 @@ function hud(){
 }
 
 function startGame(){
-  score=0;hits=0;combo=1;remaining=30;running=true;last=performance.now();
+  score=0;hits=0;combo=1;remaining=30;running=true;last=performance.now();lastX=null;lastY=null;
   start.style.display="none";result.style.display="none";game.style.display="block";
   hud();timeEl.textContent="30.0";
   requestAnimationFrame(()=>{place();schedule()});
